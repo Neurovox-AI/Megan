@@ -37,7 +37,8 @@ class VoiceEngine:
 
     def _reload_clients(self):
         cfg=cfg_module.load()
-        self._claude=Anthropic(api_key=cfg.get("anthropic_key",""))
+        api_key=cfg.get("anthropic_key") or os.environ.get("ANTHROPIC_API_KEY","")
+        self._claude=Anthropic(api_key=api_key)
 
     def _set_status(self,s): self.status_callback(s)
     def is_ready(self): return self._ready

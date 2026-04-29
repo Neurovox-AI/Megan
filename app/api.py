@@ -1,5 +1,5 @@
 """VoiceImpulse — pywebview JS-Bridge"""
-import config as cfg_module
+import os, config as cfg_module
 
 class Api:
     def __init__(self, engine=None, on_setup_complete=None):
@@ -8,9 +8,8 @@ class Api:
 
     def get_config(self):
         cfg = cfg_module.load()
-        safe = {k: v for k, v in cfg.items() if k not in ("anthropic_key", "elevenlabs_key")}
-        safe["has_anthropic_key"]  = bool(cfg.get("anthropic_key"))
-        safe["has_elevenlabs_key"] = bool(cfg.get("elevenlabs_key"))
+        safe = {k: v for k, v in cfg.items() if k != "anthropic_key"}
+        safe["has_anthropic_key"] = bool(cfg.get("anthropic_key") or os.environ.get("ANTHROPIC_API_KEY"))
         return safe
 
     def complete_setup(self, plan, anthropic_key="", elevenlabs_key="", voice_id=""):
