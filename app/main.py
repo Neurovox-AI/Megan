@@ -65,7 +65,7 @@ def show_overlay(status):
             "", _html("overlay"), js_api=_api,
             width=320, height=64,
             resizable=False, on_top=True, frameless=True,
-            background_color="#00000000", x=x, y=y)
+            background_color="#0e0a08", x=x, y=y)
         _windows["overlay"] = win
         def _closed(): _windows.pop("overlay", None)
         win.events.closed += _closed
