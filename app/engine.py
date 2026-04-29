@@ -55,6 +55,7 @@ SESSION_TIMEOUT = 300  # Verlauf nach 5 Min. Inaktivität löschen
 class VoiceEngine:
     def __init__(self, status_callback=None):
         self.status_callback=status_callback or (lambda s: None)
+        self.audio_callback=None
         self._history=[]; self._is_speaking=False; self._active=False
         self._ready=False; self._afplay_proc=None; self._lock=threading.Lock()
         self._last_activity=time.time()
@@ -135,13 +136,18 @@ class VoiceEngine:
     def _record(self):
         for attempt in range(3):
             try:
-                buf=[]; silence_cnt=0; speech_on=False
+                buf=[]; silence_cnt=0; speech_on=False; _lvl_frame=0
                 with sd.InputStream(samplerate=SAMPLERATE,channels=1,dtype="float32",blocksize=VAD_CHUNK) as s:
                     for _ in range(int(MAX_WAIT*SAMPLERATE/VAD_CHUNK)):
                         if self._is_speaking: return None
                         block,_=s.read(VAD_CHUNK); b=block.flatten().astype(np.float32)
                         prob=self._vad(torch.from_numpy(b).unsqueeze(0),SAMPLERATE).item()
-                        if prob>VAD_THRESHOLD: speech_on=True; silence_cnt=0; buf.append(b)
+                        if prob>VAD_THRESHOLD:
+                            speech_on=True; silence_cnt=0; buf.append(b)
+                            _lvl_frame+=1
+                            if self.audio_callback and _lvl_frame%3==0:
+                                rms=float(np.sqrt(np.mean(b**2)))
+                                self.audio_callback(min(1.0, rms*8))
                         elif speech_on:
                             buf.append(b); silence_cnt+=1
                             if silence_cnt>int(SILENCE_DURATION*SAMPLERATE/VAD_CHUNK): break

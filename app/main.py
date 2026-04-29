@@ -53,22 +53,49 @@ def _update_win(name, js):
         try: win.evaluate_js(js)
         except: pass
 
+def _patch_overlay_window():
+    def _bg():
+        time.sleep(0.4)
+        def _main():
+            try:
+                import AppKit
+                for ns_win in AppKit.NSApp.windows():
+                    if ns_win.title() == "__VI_OVERLAY__":
+                        ns_win.setOpaque_(False)
+                        ns_win.setBackgroundColor_(AppKit.NSColor.clearColor())
+                        ns_win.setHasShadow_(False)
+                        ns_win.setLevel_(AppKit.NSFloatingWindowLevel)
+                        print("[Overlay] Transparenz OK")
+                        return
+            except Exception as e:
+                print(f"[Overlay] {e}")
+        try:
+            import AppKit
+            AppKit.NSOperationQueue.mainQueue().addOperationWithBlock_(_main)
+        except Exception as e:
+            print(f"[Overlay] Dispatch: {e}")
+    threading.Thread(target=_bg, daemon=True).start()
+
+def on_audio_level(level):
+    _update_win("overlay", f"typeof setAudioLevel!=='undefined'&&setAudioLevel({level:.3f})")
+
 def show_overlay(status):
     if "overlay" not in _windows:
         try:
             screens = webview.screens
             s = screens[0] if screens else None
-            x = (s.width  // 2 - 160) if s else 600
-            y = (s.height - 110)       if s else 900
-        except: x, y = 600, 900
+            x = (s.width  // 2 - 130) if s else 595
+            y = (s.height - 280)       if s else 700
+        except: x, y = 595, 700
         win = webview.create_window(
-            "", _html("overlay"), js_api=_api,
-            width=320, height=64,
+            "__VI_OVERLAY__", _html("overlay"), js_api=_api,
+            width=260, height=260,
             resizable=False, on_top=True, frameless=True,
-            background_color="#0e0a08", x=x, y=y)
+            background_color="#080404", x=x, y=y)
         _windows["overlay"] = win
         def _closed(): _windows.pop("overlay", None)
         win.events.closed += _closed
+        win.events.loaded += _patch_overlay_window
     _update_win("overlay", f"typeof setStatus!=='undefined'&&setStatus('{status}')")
 
 def hide_overlay():
@@ -166,6 +193,7 @@ def _patch_no_quit():
 def main():
     global _engine, _api
     _engine = engine_module.VoiceEngine(status_callback=on_status_change)
+    _engine.audio_callback = on_audio_level
     _api    = api_module.Api(engine=_engine)
     threading.Thread(target=_engine.initialize, daemon=True).start()
     setup_hotkey()
