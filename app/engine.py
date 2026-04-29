@@ -181,8 +181,15 @@ class VoiceEngine:
         if m:
             cmd=m.group(1).strip()
             try:
-                if cmd.startswith("tell application"): subprocess.Popen(["osascript","-e",cmd])
-                else: subprocess.Popen(cmd,shell=True)
+                with tempfile.NamedTemporaryFile(suffix=".applescript", mode="w", delete=False) as f:
+                    f.write(cmd); script_path=f.name
+                result=subprocess.run(["osascript", script_path], capture_output=True, text=True, timeout=10)
+                if result.returncode != 0:
+                    print(f"[EXEC] Fehler: {result.stderr.strip()}")
+                else:
+                    print(f"[EXEC] OK: {result.stdout.strip()[:80]}")
+                try: os.unlink(script_path)
+                except: pass
             except Exception as e: print(f"[EXEC] {e}")
             return re.sub(r"\[EXEC:.*?\]","",reply,flags=re.DOTALL).strip()
         return reply
