@@ -1,0 +1,15 @@
+anthropic>=0.34.0
+edge-tts>=6.1.0
+sounddevice>=0.4.6
+scipy>=1.11.0
+numpy>=1.24.0
+mlx-whisper>=0.4.0
+silero-vad>=4.0.0
+torch>=2.0.0
+pywebview>=5.0.0
+pyobjc-core>=10.0
+pyobjc-framework-Cocoa>=10.0
+pyobjc-framework-AppKit>=10.0
+pynput>=1.7.6
+python-dotenv>=1.0.0
+pyinstaller>=6.0.0

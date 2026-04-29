@@ -1,0 +1,9 @@
+{
+  "wake_word": "hey megan",
+  "agent_name": "Megan",
+  "ptt_key": "cmd+shift+m",
+  "wake_word_enabled": false,
+  "wake_word_sensitivity": 0.6,
+  "sample_rate": 16000,
+  "chunk_seconds": 2
+}

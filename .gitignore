@@ -1,0 +1,18 @@
+# Secrets & Datenbank
+.env
+*.db
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+
+# macOS
+.DS_Store
+
+# Claude Code (lokale Settings, nicht teilen)
+.claude/
