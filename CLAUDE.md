@@ -191,6 +191,16 @@ PATCH /activation/settings
 
 ---
 
+## Erledigte Arbeiten
+
+### 2026-04-29 — App UI Dark Theme (Kollege)
+- `app/ui/style.css` — komplettes Dark Theme: `--bg:#060402`, Cream-Text `#F5EDE2`, Glass-Surfaces `rgba(255,255,255,0.04)`, Rose/Pink Akzente, ambient body glow
+- `app/ui/dashboard.html` — alle Stat-Cards, Nav-Buttons und Usage-Bar im Dark Design
+- `app/ui/settings.html` — Section-Cards, Inputs, Toggles und Toast im Dark Theme
+- `app/ui/setup.html` — Plan-Cards mit Rose-Border bei Selektion, Info-Rows im Dark Glass Stil
+
+---
+
 ## Nächste Schritte (offen)
 
 - [ ] Seraphina als optionale mehrsprachige Stimme einbauen
