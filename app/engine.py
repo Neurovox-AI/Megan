@@ -7,10 +7,26 @@ from anthropic import Anthropic
 from silero_vad import load_silero_vad
 import config as cfg_module
 
-TTS_VOICE = "de-AT-IngridNeural"
+TTS_VOICE    = "de-AT-IngridNeural"
+MODEL_FAST   = "claude-haiku-4-5-20251001"
+MODEL_STRONG = "claude-sonnet-4-6"
 
 SAMPLERATE=16000; VAD_CHUNK=512; VAD_THRESHOLD=0.5; SILENCE_DURATION=1.2; MAX_WAIT=60
 WHISPER_MODEL="mlx-community/whisper-small-mlx-q4"; MAX_HISTORY=10
+
+# Aufgaben die Sonnet brauchen
+COMPLEX_KEYWORDS = {
+    "email", "e-mail", "mail", "nachricht schreiben", "schreib",
+    "termin", "kalender", "kalendereintrag",
+    "verfasse", "erkläre", "erklar", "analysiere", "zusammenfass",
+    "erstelle eine liste", "mehrere", "und danach", "außerdem",
+}
+# Einfache Einzel-Aktionen → Haiku
+SIMPLE_KEYWORDS = {
+    "öffne", "schließe", "starte", "stopp", "berechne",
+    "was ist", "wie viel", "wie heißt", "wer ist",
+    "spiel", "hallo", "danke", "tschüss", "mach auf", "mach zu",
+}
 
 HALLUCINATIONS=[r"^(oh\s*)+$",r"^(uh\s*)+$",r"^(äh\s*)+$",r"^\s*$",r"^(\.+\s*)+$"]
 
@@ -126,11 +142,23 @@ class VoiceEngine:
             try: os.unlink(path)
             except: pass
 
+    def _select_model(self, text):
+        t = text.lower()
+        words = t.split()
+        if any(kw in t for kw in COMPLEX_KEYWORDS): return MODEL_STRONG
+        if len(words) > 12: return MODEL_STRONG
+        if words.count("und") >= 2: return MODEL_STRONG
+        if any(kw in t for kw in SIMPLE_KEYWORDS): return MODEL_FAST
+        if len(words) <= 8: return MODEL_FAST
+        return MODEL_STRONG
+
     def _ask_claude(self, text):
         self._history.append({"role":"user","content":text})
         if len(self._history)>MAX_HISTORY*2: self._history=self._history[-MAX_HISTORY*2:]
+        model=self._select_model(text)
+        print(f"[Model] {model.split('-')[1]}")
         try:
-            r=self._claude.messages.create(model="claude-sonnet-4-6",max_tokens=512,
+            r=self._claude.messages.create(model=model,max_tokens=512,
                 system=SYSTEM.format(date=datetime.now().strftime("%A, %d.%m.%Y")),
                 messages=self._history)
             reply=r.content[0].text
