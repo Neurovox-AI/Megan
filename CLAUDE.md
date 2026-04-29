@@ -5,12 +5,76 @@ Ein verbraucherfreundlicher Desktop-Agent mit Sprachsteuerung.
 Nutzer sprechen oder tippen Befehle – der Agent führt sie direkt aus.
 Entwickelt auf Basis der Marktanalyse vom 14. April 2026.
 
+---
+
+## WICHTIG: Auto-Push Regel
+
+**Nach JEDER Änderung, die du machst, führst du automatisch folgende Befehle aus:**
+
+```bash
+git add .
+git commit -m "kurze Beschreibung der Änderung"
+git push
+```
+
+Kein Ausnahme. Jede Datei, jede kleine Änderung, sofort pushen.
+Wir arbeiten zu zweit – der andere muss immer den aktuellen Stand haben.
+
+---
+
+## Zuständigkeiten
+
+| Bereich | Ordner | Wer |
+|---------|--------|-----|
+| Backend API & Logik | `backend/` | Andreas |
+| App Engine & Python | `app/*.py` | Andreas |
+| App UI (Desktop Design) | `app/ui/` | Kollege |
+| Frontend (Homepage & Web) | `frontend/` | Kollege |
+
+**Faustregel:**
+- Alles mit `.py` → Andreas
+- Alles mit `.html`, `.css`, `.js` → Kollege
+
+---
+
 ## Projektstruktur
+
 ```
 Voice Impulse Projekt/
-├── backend/              ← Python FastAPI Backend (unser Code)
+├── backend/              ← Python FastAPI Backend (Andreas)
+│   ├── 01_audio_transkription/
+│   ├── 02_intent_engine/
+│   ├── 03_dateisystem/
+│   ├── 04_notizen_todos/
+│   ├── 05_drafts/
+│   ├── 06_kalender/
+│   ├── 07_bestaetigung/
+│   ├── 08_aktionsverlauf/
+│   ├── 09_fehlerbehandlung/
+│   ├── 10_sprachausgabe/
+│   ├── 11_aktivierung/
+│   ├── main.py
+│   ├── config.py
+│   ├── database.py
+│   ├── chat.py
+│   └── start.py
+│
+├── app/                  ← Neue App-Schicht
+│   ├── engine.py         ← Andreas
+│   ├── api.py            ← Andreas
+│   ├── main.py           ← Andreas
+│   ├── config.py         ← Andreas
+│   └── ui/               ← Kollege (Desktop App Design)
+│       ├── dashboard.html
+│       ├── settings.html
+│       ├── setup.html
+│       └── style.css
+│
+├── frontend/             ← Kollege (Homepage & Web)
+│
 ├── API_DOKU.md           ← Dokumentation für den Frontend-Kollegen
 └── CLAUDE.md             ← Diese Datei
+
 ```
 
 ---
@@ -37,13 +101,13 @@ Voice Impulse Projekt/
 
 | Datei | Zweck |
 |-------|-------|
-| `main.py` | FastAPI App, alle Router eingebunden |
-| `config.py` | API Keys, Suchpfade, Modell-Einstellungen |
-| `database.py` | SQLite Setup (notes, todos, drafts, history) |
-| `chat.py` | Konversations-Endpunkt `/chat` |
-| `start.py` | Starter-Skript für die Desktop-App |
-| `.env` | API Keys (nicht ins Git!) |
-| `activation_settings.json` | Wake Word & PTT Einstellungen |
+| `backend/main.py` | FastAPI App, alle Router eingebunden |
+| `backend/config.py` | API Keys, Suchpfade, Modell-Einstellungen |
+| `backend/database.py` | SQLite Setup (notes, todos, drafts, history) |
+| `backend/chat.py` | Konversations-Endpunkt `/chat` |
+| `backend/start.py` | Starter-Skript für die Desktop-App |
+| `backend/.env` | API Keys (nicht ins Git!) |
+| `backend/activation_settings.json` | Wake Word & PTT Einstellungen |
 
 ---
 
@@ -60,9 +124,17 @@ Voice Impulse Projekt/
 
 ---
 
-## API Keys
-- **Anthropic**: In `.env` gespeichert – nur für Voice Impulse verwenden
-- **OpenAI**: Nicht nötig – Whisper läuft lokal
+## Server starten
+
+```bash
+cd backend
+python3 start.py
+# oder direkt:
+uvicorn main:app --port 8000
+```
+
+Server läuft auf: `http://localhost:8000`
+Interaktive Doku: `http://localhost:8000/docs`
 
 ---
 
@@ -108,20 +180,6 @@ PATCH /activation/settings
 
 ---
 
-## Server starten
-
-```bash
-cd backend
-python3 start.py
-# oder direkt:
-uvicorn main:app --port 8000
-```
-
-Server läuft auf: `http://localhost:8000`
-Interaktive Doku: `http://localhost:8000/docs`
-
----
-
 ## Getestete Befehle (funktionieren alle)
 
 - "Öffne die letzte PDF"
@@ -139,4 +197,4 @@ Interaktive Doku: `http://localhost:8000/docs`
 - [ ] Wake-Word "Ja?"-Begrüßungston nach Erkennung
 - [ ] Windows-Support (Phase 2)
 - [ ] Cloud-Sync für Notizen (Phase 2)
-- [ ] Frontend-Integration mit Kollegen abstimmen
+- [ ] Frontend bauen (Kollege)
