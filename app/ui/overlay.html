@@ -14,120 +14,184 @@
 
   .scene {
     width:260px; height:260px;
-    display:flex; flex-direction:column;
-    align-items:center; justify-content:flex-start;
-    padding-top:24px;
+    display:flex;
+    align-items:center; justify-content:center;
     position:relative;
   }
 
-  /* Maske die von unten aufsteigt */
-  .mask {
-    position:absolute; bottom:0; left:0; right:0;
-    height:110px;
-    background:linear-gradient(to top, rgba(8,4,4,0.95) 0%, rgba(8,4,4,0.7) 55%, transparent 100%);
-    pointer-events:none;
-    z-index:1;
-  }
-
-  /* Siri-artiger Ball */
-  .orb-wrap {
-    position:relative; z-index:2;
-    width:140px; height:140px;
-    display:flex; align-items:center; justify-content:center;
-  }
-
-  .orb-glow {
+  /* Äußerer Ambient-Glow */
+  .glow-ring {
     position:absolute;
-    width:140px; height:140px; border-radius:50%;
-    background:radial-gradient(circle at 40% 40%, rgba(244,114,182,0.4), rgba(232,69,106,0.2), transparent 70%);
-    filter:blur(18px);
-    animation:glow-pulse 2.4s ease-in-out infinite;
+    width:210px; height:210px; border-radius:50%;
+    background:radial-gradient(circle, rgba(244,114,182,0.25) 0%, rgba(232,69,106,0.08) 55%, transparent 75%);
+    filter:blur(22px);
+    animation:glow-pulse 2.8s ease-in-out infinite;
   }
 
+  /* Glaskugel */
   .orb {
-    width:110px; height:110px;
-    border-radius:50%;
-    background:radial-gradient(circle at 38% 32%,
-      #f9a8d4 0%, #F472B6 25%, #E8456A 55%, #C41853 80%, #8B0D33 100%);
-    filter:blur(1.5px);
+    position:relative;
+    width:176px; height:176px; border-radius:50%;
+    overflow:hidden;
+
+    /* Glasmaterial */
+    background:radial-gradient(circle at 34% 28%,
+      rgba(255,255,255,0.18) 0%,
+      rgba(244,114,182,0.07) 35%,
+      rgba(139,13,51,0.06)   65%,
+      rgba(0,0,0,0.12)       100%);
+
+    border:1.5px solid rgba(255,255,255,0.22);
+
     box-shadow:
-      0 0 40px rgba(232,69,106,0.7),
-      0 0 80px rgba(232,69,106,0.35),
-      0 0 140px rgba(232,69,106,0.15),
-      inset 0 8px 20px rgba(255,255,255,0.15);
-    animation:morph 3.2s ease-in-out infinite, breathe 2.2s ease-in-out infinite;
-    transform-origin:center;
-    will-change:transform, border-radius, filter;
+      0 0 50px rgba(232,69,106,0.45),
+      0 0 100px rgba(232,69,106,0.18),
+      inset 0 2px 35px rgba(255,255,255,0.08),
+      inset 0 -12px 28px rgba(196,24,83,0.12);
+
+    -webkit-backdrop-filter:blur(6px);
+    backdrop-filter:blur(6px);
   }
 
-  @keyframes morph {
-    0%,100%{ border-radius:50%; }
-    20%{ border-radius:62% 38% 56% 44% / 44% 58% 42% 56%; }
-    40%{ border-radius:44% 56% 42% 58% / 58% 42% 60% 40%; }
-    60%{ border-radius:56% 44% 60% 40% / 40% 62% 38% 58%; }
-    80%{ border-radius:38% 62% 44% 56% / 56% 40% 60% 44%; }
+  canvas {
+    position:absolute;
+    top:0; left:0;
+    width:176px; height:176px;
   }
-  @keyframes breathe {
-    0%,100%{ transform:scale(1); filter:blur(1.5px); }
-    50%{ transform:scale(1.08); filter:blur(2.5px); }
+
+  /* Glanzpunkt oben links */
+  .orb::before {
+    content:'';
+    position:absolute;
+    top:14px; left:20px;
+    width:52px; height:28px;
+    border-radius:50%;
+    background:radial-gradient(ellipse, rgba(255,255,255,0.65) 0%, transparent 75%);
+    transform:rotate(-25deg);
+    filter:blur(3px);
+    z-index:2;
+    pointer-events:none;
   }
+
+  /* Kleiner Reflex unten rechts */
+  .orb::after {
+    content:'';
+    position:absolute;
+    bottom:22px; right:24px;
+    width:22px; height:14px;
+    border-radius:50%;
+    background:radial-gradient(ellipse, rgba(255,255,255,0.25) 0%, transparent 75%);
+    filter:blur(2px);
+    z-index:2;
+    pointer-events:none;
+  }
+
   @keyframes glow-pulse {
-    0%,100%{ opacity:0.6; transform:scale(1); }
-    50%{ opacity:1; transform:scale(1.15); }
-  }
-
-  /* Thinking state — langsameres Pulsieren */
-  body.thinking .orb {
-    animation:morph 4s ease-in-out infinite, breathe 3s ease-in-out infinite;
-    filter:blur(3px) brightness(0.7);
-  }
-  /* Speaking state — schnell */
-  body.speaking .orb {
-    animation:morph 1.8s ease-in-out infinite, breathe 1.4s ease-in-out infinite;
+    0%,100%{ opacity:0.55; transform:scale(1); }
+    50%{ opacity:1; transform:scale(1.13); }
   }
 </style>
 </head>
-<body class="listening">
+<body>
 <div class="scene">
-  <div class="orb-wrap">
-    <div class="orb-glow" id="glow"></div>
-    <div class="orb" id="orb"></div>
+  <div class="glow-ring" id="glow"></div>
+  <div class="orb">
+    <canvas id="wave" width="176" height="176"></canvas>
   </div>
-  <div class="mask"></div>
 </div>
 <script>
-const orb  = document.getElementById('orb');
-const glow = document.getElementById('glow');
+const canvas = document.getElementById('wave');
+const ctx    = document.getElementById('wave').getContext('2d');
+const glow   = document.getElementById('glow');
+const W = 176, H = 176, CX = W/2, CY = H/2;
 
-let currentScale = 1;
-let targetScale  = 1;
-let glowScale    = 1;
+let audioLevel  = 0;
+let targetLevel = 0;
+let phase = [0, 0, 0];
+let st = 'listening';
 
-// Audio-Level vom Mikrofon → Ball reagiert
-window.setAudioLevel = function(level) {
-  // level: 0.0–1.0
-  targetScale = 1 + (level * 0.45);
-};
-
+window.setAudioLevel = function(level) { targetLevel = level; };
 window.setStatus = function(s) {
-  document.body.className = s;
-  if (s === 'thinking' || s === 'speaking') {
-    targetScale = 1;
-  }
+  st = s;
+  if (s === 'speaking')  targetLevel = 0.42;
+  if (s === 'thinking')  targetLevel = 0.12;
+  if (s === 'listening') targetLevel = Math.max(targetLevel, 0);
 };
 
-// Sanfte Interpolation
-(function animate() {
-  currentScale += (targetScale - currentScale) * 0.18;
-  targetScale  = Math.max(1, targetScale - 0.03);
-  glowScale    = 1 + ((currentScale - 1) * 1.8);
+const WAVES = [
+  { freq:1.6, ampMult:1.00, width:2.8, alphaMax:0.92 },
+  { freq:2.4, ampMult:0.60, width:2.0, alphaMax:0.50 },
+  { freq:3.2, ampMult:0.36, width:1.4, alphaMax:0.30 },
+];
 
-  orb.style.transform  = `scale(${currentScale.toFixed(3)})`;
-  glow.style.transform = `scale(${glowScale.toFixed(3)})`;
-  glow.style.opacity   = (0.5 + (currentScale - 1) * 2).toFixed(3);
+function draw() {
+  ctx.clearRect(0, 0, W, H);
 
-  requestAnimationFrame(animate);
-})();
+  // Smooth level
+  audioLevel += (targetLevel - audioLevel) * 0.14;
+  if (st === 'listening') targetLevel = Math.max(0.04, targetLevel - 0.022);
+
+  // Phase speeds
+  const spd = st === 'speaking' ? 0.065
+            : st === 'thinking' ? 0.016
+            : 0.030;
+  phase[0] += spd;
+  phase[1] += spd * 0.70;
+  phase[2] += spd * 1.30;
+
+  const baseAmp = 14 + audioLevel * 42;
+
+  WAVES.forEach((w, i) => {
+    const amp  = baseAmp * w.ampMult;
+    const alf  = w.alphaMax * (0.55 + audioLevel * 0.45);
+
+    // Gradient entlang der X-Achse
+    const g = ctx.createLinearGradient(0, 0, W, 0);
+    g.addColorStop(0,   `rgba(249,168,212,${(alf*0.25).toFixed(2)})`);
+    g.addColorStop(0.25,`rgba(244,114,182,${alf.toFixed(2)})`);
+    g.addColorStop(0.5, `rgba(232,69,106,${alf.toFixed(2)})`);
+    g.addColorStop(0.75,`rgba(244,114,182,${alf.toFixed(2)})`);
+    g.addColorStop(1,   `rgba(249,168,212,${(alf*0.25).toFixed(2)})`);
+
+    // Wellenlinie
+    ctx.beginPath();
+    for (let x = 0; x <= W; x++) {
+      const envelope = Math.sin((x / W) * Math.PI); // weiche Enden
+      const y = CY + Math.sin((x / W) * Math.PI * 2 * w.freq + phase[i]) * amp * envelope;
+      x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = g;
+    ctx.lineWidth   = w.width;
+    ctx.lineJoin    = 'round';
+    ctx.lineCap     = 'round';
+    ctx.stroke();
+
+    // Füllung unter/über der Welle
+    ctx.beginPath();
+    ctx.moveTo(0, CY);
+    for (let x = 0; x <= W; x++) {
+      const envelope = Math.sin((x / W) * Math.PI);
+      const y = CY + Math.sin((x / W) * Math.PI * 2 * w.freq + phase[i]) * amp * envelope;
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo(W, CY);
+    ctx.closePath();
+    const fg = ctx.createLinearGradient(0, CY - amp, 0, CY + amp);
+    fg.addColorStop(0, `rgba(244,114,182,${(alf * 0.18).toFixed(2)})`);
+    fg.addColorStop(1, `rgba(232,69,106,${(alf * 0.04).toFixed(2)})`);
+    ctx.fillStyle = fg;
+    ctx.fill();
+  });
+
+  // Outer glow reagiert auf Audio
+  const gs = (1 + audioLevel * 0.28).toFixed(3);
+  const go = (0.5 + audioLevel * 0.5).toFixed(3);
+  glow.style.transform = `scale(${gs})`;
+  glow.style.opacity   = go;
+
+  requestAnimationFrame(draw);
+}
+draw();
 </script>
 </body>
 </html>
