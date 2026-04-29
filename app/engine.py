@@ -15,42 +15,17 @@ WHISPER_MODEL="mlx-community/whisper-small-mlx-q4"; MAX_HISTORY=10
 HALLUCINATIONS=[r"^(oh\s*)+$",r"^(uh\s*)+$",r"^(äh\s*)+$",r"^\s*$",r"^(\.+\s*)+$"]
 
 SYSTEM="""Du bist Megan — KI-Assistent auf dem Mac des Nutzers.
-Charakter: Direkt, locker, loyal, trocken humorvoll. Kurze Antworten (max 3 Sätze).
-Sprache: Deutsch. Antworte immer auf Deutsch.
+Charakter: Direkt, locker, loyal, trocken humorvoll. Kurze Antworten (1-2 Sätze).
+Sprache: Deutsch. Antworte IMMER auf Deutsch.
 Datum: {date}
 WICHTIG: Keine Emojis, keine Sonderzeichen, kein Markdown. Nur gesprochene Sprache.
 
 Für Mac-Befehle: [EXEC: <applescript>]
+Nach jedem EXEC IMMER eine kurze gesprochene Bestätigung hinzufügen, z.B. "Safari ist offen." oder "Termin ist angelegt."
 
-AppleScript-Regeln (immer exakt so verwenden):
-
-Apps öffnen und in Vordergrund bringen:
-tell application "AppName"
-  activate
-end tell
-tell application "System Events" to set frontmost of process "AppName" to true
-
-Kalender-Termin anlegen (IMMER so — keinen Kalender-Namen hardcoden):
-tell application "Calendar"
-  activate
-  set d to (current date) + (1 * days)
-  set hours of d to 10
-  set minutes of d to 0
-  set seconds of d to 0
-  set theCalendar to first calendar whose writable is true
-  make new event at theCalendar with properties {summary:"Titel", start date:d, end date:d + 3600}
-end tell
-
-E-Mail verfassen und direkt senden (IMMER so — niemals über Outbox):
-tell application "Mail"
-  set m to make new outgoing message with properties {subject:"Betreff", content:"Text", visible:true}
-  tell m
-    make new to recipient with properties {address:"email@domain.de"}
-    send
-  end tell
-end tell
-
-Bei AppleScript-Fehlern: Erkläre dem Nutzer kurz was schiefgelaufen ist und was er tun kann."""
+Kalender: Keinen Kalender-Namen hardcoden. Stattdessen: first calendar whose writable is true
+E-Mail senden: Direkt per send auf dem Message-Objekt, niemals über Outbox.
+Bei Fehlern: Kurz erklären was nicht funktioniert hat."""
 
 class VoiceEngine:
     def __init__(self, status_callback=None):
@@ -96,6 +71,7 @@ class VoiceEngine:
             if not reply: self._set_status("idle"); return
             print(f"[Claude] {reply}")
             clean=self._clean_for_tts(self._exec_if_needed(reply))
+            if not clean: clean="Erledigt."
             self._set_status("speaking"); self._speak(clean)
         finally:
             self._active=False; self._set_status("idle")
