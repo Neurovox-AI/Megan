@@ -50,19 +50,33 @@ Bei Fehlern: Kurz erklären was nicht funktioniert hat."""
 
 STT_CLEAN_SYSTEM = "Bereinige den diktierten deutschen Text. Entferne Füllwörter (ähm, äh, halt, einfach mal, sozusagen), korrigiere offensichtliche Versprecher, behalte die Bedeutung exakt. Gib NUR den bereinigten Text zurück."
 
+SESSION_TIMEOUT = 300  # Verlauf nach 5 Min. Inaktivität löschen
+
 class VoiceEngine:
     def __init__(self, status_callback=None):
         self.status_callback=status_callback or (lambda s: None)
         self._history=[]; self._is_speaking=False; self._active=False
         self._ready=False; self._afplay_proc=None; self._lock=threading.Lock()
+        self._last_activity=time.time()
 
     def initialize(self):
         self._set_status("loading")
         try:
             self._vad=load_silero_vad(); self._vad.eval()
             self._reload_clients(); self._ready=True; self._set_status("idle")
+            self._start_session_watcher()
         except Exception as e:
             self._set_status("error"); print(f"[Engine] Init-Fehler: {e}")
+
+    def _start_session_watcher(self):
+        def _watch():
+            while True:
+                time.sleep(30)
+                if not self._active and not self._is_speaking:
+                    if self._history and (time.time()-self._last_activity) > SESSION_TIMEOUT:
+                        self._history.clear()
+                        print(f"[Session] Verlauf nach {SESSION_TIMEOUT//60} Min. Inaktivität geleert.")
+        threading.Thread(target=_watch, daemon=True).start()
 
     def _reload_clients(self):
         cfg=cfg_module.load()
@@ -113,22 +127,30 @@ class VoiceEngine:
             print(f"[Claude] {reply}")
             clean=self._clean_for_tts(self._exec_if_needed(reply))
             if not clean: clean="Erledigt."
+            self._last_activity=time.time()
             self._set_status("speaking"); self._speak(clean)
         finally:
             self._active=False; self._set_status("idle")
 
     def _record(self):
-        buf=[]; silence_cnt=0; speech_on=False
-        with sd.InputStream(samplerate=SAMPLERATE,channels=1,dtype="float32",blocksize=VAD_CHUNK) as s:
-            for _ in range(int(MAX_WAIT*SAMPLERATE/VAD_CHUNK)):
-                if self._is_speaking: return None
-                block,_=s.read(VAD_CHUNK); b=block.flatten().astype(np.float32)
-                prob=self._vad(torch.from_numpy(b).unsqueeze(0),SAMPLERATE).item()
-                if prob>VAD_THRESHOLD: speech_on=True; silence_cnt=0; buf.append(b)
-                elif speech_on:
-                    buf.append(b); silence_cnt+=1
-                    if silence_cnt>int(SILENCE_DURATION*SAMPLERATE/VAD_CHUNK): break
-        return np.concatenate(buf) if speech_on and buf else None
+        for attempt in range(3):
+            try:
+                buf=[]; silence_cnt=0; speech_on=False
+                with sd.InputStream(samplerate=SAMPLERATE,channels=1,dtype="float32",blocksize=VAD_CHUNK) as s:
+                    for _ in range(int(MAX_WAIT*SAMPLERATE/VAD_CHUNK)):
+                        if self._is_speaking: return None
+                        block,_=s.read(VAD_CHUNK); b=block.flatten().astype(np.float32)
+                        prob=self._vad(torch.from_numpy(b).unsqueeze(0),SAMPLERATE).item()
+                        if prob>VAD_THRESHOLD: speech_on=True; silence_cnt=0; buf.append(b)
+                        elif speech_on:
+                            buf.append(b); silence_cnt+=1
+                            if silence_cnt>int(SILENCE_DURATION*SAMPLERATE/VAD_CHUNK): break
+                return np.concatenate(buf) if speech_on and buf else None
+            except Exception as e:
+                print(f"[Audio] Fehler (Versuch {attempt+1}/3): {e}")
+                if attempt < 2: time.sleep(1)
+        print("[Audio] Mikrofon nicht erreichbar, überspringe.")
+        return None
 
     def _transcribe(self, audio):
         with tempfile.NamedTemporaryFile(suffix=".wav",delete=False) as f: path=f.name
@@ -140,6 +162,8 @@ class VoiceEngine:
             for p in HALLUCINATIONS:
                 if re.fullmatch(p,text,re.IGNORECASE): return ""
             return text
+        except Exception as e:
+            print(f"[STT] Fehler: {e}"); return ""
         finally:
             try: os.unlink(path)
             except: pass
