@@ -55,41 +55,53 @@ def _update_win(name, js):
 
 def _patch_overlay_window():
     def _bg():
-        time.sleep(0.5)
-        def _main():
+        try:
+            import AppKit, objc
+            WKWebView = objc.lookUpClass('WKWebView')
+        except Exception as e:
+            print(f"[Overlay] Import: {e}"); return
+
+        def fix_wv(v):
             try:
-                import AppKit, objc
-                WKWebView = objc.lookUpClass('WKWebView')
+                if v.isKindOfClass_(WKWebView):
+                    v.setValue_forKey_(False, 'drawsBackground'); return True
+                for sv in v.subviews():
+                    if fix_wv(sv): return True
+            except: pass
+            return False
 
-                def fix_webview(view):
-                    try:
-                        if view.isKindOfClass_(WKWebView):
-                            view.setValue_forKey_(False, 'drawsBackground')
-                            return True
-                        for sv in view.subviews():
-                            if fix_webview(sv): return True
-                    except: pass
-                    return False
+        # Schnelles Polling direkt nach create_window — kein langer Delay mehr
+        for attempt in range(25):
+            time.sleep(0.04 if attempt < 10 else 0.10)
+            ev = threading.Event()
+            found = [False]
 
-                for ns_win in AppKit.NSApp.windows():
-                    try:
-                        sz = ns_win.frame().size
-                        if int(sz.width) == 260 and int(sz.height) == 260:
+            def _main(ev=ev, found=found):
+                try:
+                    for ns_win in AppKit.NSApp.windows():
+                        try:
+                            sz = ns_win.frame().size
+                            if int(sz.width) != 260 or int(sz.height) != 260: continue
                             ns_win.setOpaque_(False)
                             ns_win.setBackgroundColor_(AppKit.NSColor.clearColor())
                             ns_win.setHasShadow_(False)
                             ns_win.setLevel_(AppKit.NSFloatingWindowLevel)
-                            fix_webview(ns_win.contentView())
-                            print("[Overlay] Transparenz OK")
-                            return
-                    except: pass
+                            if fix_wv(ns_win.contentView()):
+                                found[0] = True
+                                print(f"[Overlay] OK (attempt {attempt+1})")
+                        except: pass
+                except Exception as e:
+                    print(f"[Overlay] {e}")
+                finally:
+                    ev.set()
+
+            try:
+                AppKit.NSOperationQueue.mainQueue().addOperationWithBlock_(_main)
+                ev.wait(0.15)
+                if found[0]: return
             except Exception as e:
-                print(f"[Overlay] {e}")
-        try:
-            import AppKit
-            AppKit.NSOperationQueue.mainQueue().addOperationWithBlock_(_main)
-        except Exception as e:
-            print(f"[Overlay] Dispatch: {e}")
+                print(f"[Overlay] Dispatch: {e}")
+
     threading.Thread(target=_bg, daemon=True).start()
 
 def on_audio_level(level):
@@ -111,7 +123,7 @@ def show_overlay(status):
         _windows["overlay"] = win
         def _closed(): _windows.pop("overlay", None)
         win.events.closed += _closed
-        win.events.loaded += _patch_overlay_window
+        _patch_overlay_window()  # sofort starten, nicht auf loaded warten
     _update_win("overlay", f"typeof setStatus!=='undefined'&&setStatus('{status}')")
 
 def hide_overlay():
