@@ -1,197 +1,177 @@
 <!DOCTYPE html>
-<html lang="de">
+<html>
 <head>
 <meta charset="UTF-8">
 <title>__MEGAN_OVERLAY__</title>
 <style>
-  * { margin:0; padding:0; box-sizing:border-box; }
+  * { margin:0; padding:0; }
   html, body {
     width:260px; height:260px;
-    background:transparent;
+    background:transparent !important;
     overflow:hidden;
     -webkit-app-region:no-drag;
-  }
-
-  .scene {
-    width:260px; height:260px;
-    display:flex;
-    align-items:center; justify-content:center;
-    position:relative;
-  }
-
-  /* Äußerer Ambient-Glow */
-  .glow-ring {
-    position:absolute;
-    width:210px; height:210px; border-radius:50%;
-    background:radial-gradient(circle, rgba(244,114,182,0.25) 0%, rgba(232,69,106,0.08) 55%, transparent 75%);
-    filter:blur(22px);
-    animation:glow-pulse 2.8s ease-in-out infinite;
-  }
-
-  /* Glaskugel */
-  .orb {
-    position:relative;
-    width:176px; height:176px; border-radius:50%;
-    overflow:hidden;
-
-    /* Glasmaterial */
-    background:radial-gradient(circle at 34% 28%,
-      rgba(255,255,255,0.18) 0%,
-      rgba(244,114,182,0.07) 35%,
-      rgba(139,13,51,0.06)   65%,
-      rgba(0,0,0,0.12)       100%);
-
-    border:1.5px solid rgba(255,255,255,0.22);
-
-    box-shadow:
-      0 0 50px rgba(232,69,106,0.45),
-      0 0 100px rgba(232,69,106,0.18),
-      inset 0 2px 35px rgba(255,255,255,0.08),
-      inset 0 -12px 28px rgba(196,24,83,0.12);
-
-    -webkit-backdrop-filter:blur(6px);
-    backdrop-filter:blur(6px);
-  }
-
-  canvas {
-    position:absolute;
-    top:0; left:0;
-    width:176px; height:176px;
-  }
-
-  /* Glanzpunkt oben links */
-  .orb::before {
-    content:'';
-    position:absolute;
-    top:14px; left:20px;
-    width:52px; height:28px;
-    border-radius:50%;
-    background:radial-gradient(ellipse, rgba(255,255,255,0.65) 0%, transparent 75%);
-    transform:rotate(-25deg);
-    filter:blur(3px);
-    z-index:2;
-    pointer-events:none;
-  }
-
-  /* Kleiner Reflex unten rechts */
-  .orb::after {
-    content:'';
-    position:absolute;
-    bottom:22px; right:24px;
-    width:22px; height:14px;
-    border-radius:50%;
-    background:radial-gradient(ellipse, rgba(255,255,255,0.25) 0%, transparent 75%);
-    filter:blur(2px);
-    z-index:2;
-    pointer-events:none;
-  }
-
-  @keyframes glow-pulse {
-    0%,100%{ opacity:0.55; transform:scale(1); }
-    50%{ opacity:1; transform:scale(1.13); }
   }
 </style>
 </head>
 <body>
-<div class="scene">
-  <div class="glow-ring" id="glow"></div>
-  <div class="orb">
-    <canvas id="wave" width="176" height="176"></canvas>
-  </div>
-</div>
+<canvas id="c" style="display:block;"></canvas>
 <script>
-const canvas = document.getElementById('wave');
-const ctx    = document.getElementById('wave').getContext('2d');
-const glow   = document.getElementById('glow');
-const W = 176, H = 176, CX = W/2, CY = H/2;
+const c   = document.getElementById('c');
+const ctx = c.getContext('2d');
+const S   = 260;
+const dpr = window.devicePixelRatio || 2;
+
+c.width  = S * dpr;
+c.height = S * dpr;
+c.style.width  = S + 'px';
+c.style.height = S + 'px';
+ctx.scale(dpr, dpr);
+
+const CX = S/2, CY = S/2, R = 96;
 
 let audioLevel  = 0;
 let targetLevel = 0;
-let phase = [0, 0, 0];
-let st = 'listening';
+let phase       = [0, 0, 0];
+let colorAngle  = 0;
+let st          = 'listening';
 
-window.setAudioLevel = function(level) { targetLevel = level; };
-window.setStatus = function(s) {
+window.setAudioLevel = l => { targetLevel = l; };
+window.setStatus = s => {
   st = s;
-  if (s === 'speaking')  targetLevel = 0.42;
-  if (s === 'thinking')  targetLevel = 0.12;
-  if (s === 'listening') targetLevel = Math.max(targetLevel, 0);
+  if (s === 'speaking') targetLevel = 0.52;
+  if (s === 'thinking') targetLevel = 0.14;
 };
 
 const WAVES = [
-  { freq:1.6, ampMult:1.00, width:2.8, alphaMax:0.92 },
-  { freq:2.4, ampMult:0.60, width:2.0, alphaMax:0.50 },
-  { freq:3.2, ampMult:0.36, width:1.4, alphaMax:0.30 },
+  { freq:1.7, mult:1.00, lw:2.8, a:0.90 },
+  { freq:2.6, mult:0.58, lw:2.0, a:0.50 },
+  { freq:3.4, mult:0.34, lw:1.4, a:0.30 },
 ];
 
-function draw() {
-  ctx.clearRect(0, 0, W, H);
+function frame() {
+  ctx.clearRect(0, 0, S, S);
 
-  // Smooth level
-  audioLevel += (targetLevel - audioLevel) * 0.14;
-  if (st === 'listening') targetLevel = Math.max(0.04, targetLevel - 0.022);
+  // Interpolation
+  audioLevel += (targetLevel - audioLevel) * 0.13;
+  if (st === 'listening') targetLevel = Math.max(0.05, targetLevel - 0.020);
 
-  // Phase speeds
-  const spd = st === 'speaking' ? 0.065
-            : st === 'thinking' ? 0.016
-            : 0.030;
+  colorAngle += 0.009;
+  const spd = st==='speaking' ? 0.070 : st==='thinking' ? 0.014 : 0.032;
   phase[0] += spd;
-  phase[1] += spd * 0.70;
-  phase[2] += spd * 1.30;
+  phase[1] += spd * 0.72;
+  phase[2] += spd * 1.38;
 
-  const baseAmp = 14 + audioLevel * 42;
+  // ── OUTER GLOW ──
+  const gr = R * (1.44 + audioLevel * 0.20);
+  const gGrad = ctx.createRadialGradient(CX, CY, R*0.55, CX, CY, gr);
+  gGrad.addColorStop(0,   `rgba(232,69,106,${(0.30 + audioLevel*0.24).toFixed(2)})`);
+  gGrad.addColorStop(0.5, `rgba(196,24,83,${(0.10 + audioLevel*0.10).toFixed(2)})`);
+  gGrad.addColorStop(1,   'rgba(139,13,51,0)');
+  ctx.beginPath();
+  ctx.arc(CX, CY, gr, 0, Math.PI*2);
+  ctx.fillStyle = gGrad;
+  ctx.fill();
 
+  // ── SPHERE CLIP ──
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(CX, CY, R, 0, Math.PI*2);
+  ctx.clip();
+
+  // Inneres Farbgradient (rotiert leicht → lebendiger Effekt)
+  const ox = Math.cos(colorAngle) * R*0.28;
+  const oy = Math.sin(colorAngle) * R*0.20;
+  const bg = ctx.createRadialGradient(CX+ox, CY+oy, 0, CX, CY, R);
+  bg.addColorStop(0,    'rgba(249,168,212,0.20)');
+  bg.addColorStop(0.38, 'rgba(244,114,182,0.10)');
+  bg.addColorStop(0.68, 'rgba(196,24,83,0.06)');
+  bg.addColorStop(1,    'rgba(12,2,6,0.15)');
+  ctx.fillStyle = bg;
+  ctx.fillRect(CX-R, CY-R, R*2, R*2);
+
+  // ── WELLEN ──
+  const baseAmp = 12 + audioLevel * 46;
   WAVES.forEach((w, i) => {
-    const amp  = baseAmp * w.ampMult;
-    const alf  = w.alphaMax * (0.55 + audioLevel * 0.45);
+    const amp  = baseAmp * w.mult;
+    const alph = w.a * (0.58 + audioLevel * 0.42);
 
-    // Gradient entlang der X-Achse
-    const g = ctx.createLinearGradient(0, 0, W, 0);
-    g.addColorStop(0,   `rgba(249,168,212,${(alf*0.25).toFixed(2)})`);
-    g.addColorStop(0.25,`rgba(244,114,182,${alf.toFixed(2)})`);
-    g.addColorStop(0.5, `rgba(232,69,106,${alf.toFixed(2)})`);
-    g.addColorStop(0.75,`rgba(244,114,182,${alf.toFixed(2)})`);
-    g.addColorStop(1,   `rgba(249,168,212,${(alf*0.25).toFixed(2)})`);
+    const lg = ctx.createLinearGradient(CX-R, 0, CX+R, 0);
+    lg.addColorStop(0,    `rgba(249,168,212,${(alph*0.18).toFixed(2)})`);
+    lg.addColorStop(0.25, `rgba(244,114,182,${alph.toFixed(2)})`);
+    lg.addColorStop(0.5,  `rgba(236,72,153,${alph.toFixed(2)})`);
+    lg.addColorStop(0.75, `rgba(244,114,182,${alph.toFixed(2)})`);
+    lg.addColorStop(1,    `rgba(249,168,212,${(alph*0.18).toFixed(2)})`);
 
-    // Wellenlinie
-    ctx.beginPath();
-    for (let x = 0; x <= W; x++) {
-      const envelope = Math.sin((x / W) * Math.PI); // weiche Enden
-      const y = CY + Math.sin((x / W) * Math.PI * 2 * w.freq + phase[i]) * amp * envelope;
-      x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    // Punkte vorberechnen
+    const pts = [];
+    for (let x = CX-R; x <= CX+R; x++) {
+      const t   = (x - (CX-R)) / (R*2);
+      const env = Math.sin(t * Math.PI);
+      const y   = CY + Math.sin(t * Math.PI * 2 * w.freq + phase[i]) * amp * env;
+      pts.push([x, y]);
     }
-    ctx.strokeStyle = g;
-    ctx.lineWidth   = w.width;
+
+    // Linie
+    ctx.beginPath();
+    pts.forEach(([x,y], j) => j===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y));
+    ctx.strokeStyle = lg;
+    ctx.lineWidth   = w.lw;
     ctx.lineJoin    = 'round';
     ctx.lineCap     = 'round';
     ctx.stroke();
 
-    // Füllung unter/über der Welle
+    // Füllfläche
     ctx.beginPath();
-    ctx.moveTo(0, CY);
-    for (let x = 0; x <= W; x++) {
-      const envelope = Math.sin((x / W) * Math.PI);
-      const y = CY + Math.sin((x / W) * Math.PI * 2 * w.freq + phase[i]) * amp * envelope;
-      ctx.lineTo(x, y);
-    }
-    ctx.lineTo(W, CY);
+    ctx.moveTo(CX-R, CY);
+    pts.forEach(([x,y]) => ctx.lineTo(x, y));
+    ctx.lineTo(CX+R, CY);
     ctx.closePath();
-    const fg = ctx.createLinearGradient(0, CY - amp, 0, CY + amp);
-    fg.addColorStop(0, `rgba(244,114,182,${(alf * 0.18).toFixed(2)})`);
-    fg.addColorStop(1, `rgba(232,69,106,${(alf * 0.04).toFixed(2)})`);
+    const fg = ctx.createLinearGradient(0, CY-amp, 0, CY+amp);
+    fg.addColorStop(0, `rgba(244,114,182,${(alph*0.22).toFixed(2)})`);
+    fg.addColorStop(1, `rgba(196,24,83,${(alph*0.04).toFixed(2)})`);
     ctx.fillStyle = fg;
     ctx.fill();
   });
 
-  // Outer glow reagiert auf Audio
-  const gs = (1 + audioLevel * 0.28).toFixed(3);
-  const go = (0.5 + audioLevel * 0.5).toFixed(3);
-  glow.style.transform = `scale(${gs})`;
-  glow.style.opacity   = go;
+  ctx.restore(); // Ende Clip
 
-  requestAnimationFrame(draw);
+  // ── GLANZLICHTER (innerhalb Kugel) ──
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(CX, CY, R, 0, Math.PI*2);
+  ctx.clip();
+
+  // Hauptglanz oben links
+  const hl1 = ctx.createRadialGradient(CX-R*0.30, CY-R*0.34, 0, CX-R*0.30, CY-R*0.34, R*0.44);
+  hl1.addColorStop(0,    'rgba(255,255,255,0.65)');
+  hl1.addColorStop(0.45, 'rgba(255,255,255,0.18)');
+  hl1.addColorStop(1,    'rgba(255,255,255,0)');
+  ctx.fillStyle = hl1;
+  ctx.fillRect(CX-R, CY-R, R*2, R*2);
+
+  // Kleiner Reflex unten rechts
+  const hl2 = ctx.createRadialGradient(CX+R*0.38, CY+R*0.40, 0, CX+R*0.38, CY+R*0.40, R*0.22);
+  hl2.addColorStop(0, 'rgba(255,255,255,0.24)');
+  hl2.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = hl2;
+  ctx.fillRect(CX-R, CY-R, R*2, R*2);
+
+  ctx.restore();
+
+  // ── GLASRAND ──
+  ctx.beginPath();
+  ctx.arc(CX, CY, R, 0, Math.PI*2);
+  const rim = ctx.createLinearGradient(CX-R, CY-R, CX+R, CY+R);
+  rim.addColorStop(0,   'rgba(255,255,255,0.50)');
+  rim.addColorStop(0.5, 'rgba(255,255,255,0.12)');
+  rim.addColorStop(1,   'rgba(255,255,255,0.32)');
+  ctx.strokeStyle = rim;
+  ctx.lineWidth   = 1.5;
+  ctx.stroke();
+
+  requestAnimationFrame(frame);
 }
-draw();
+frame();
 </script>
 </body>
 </html>

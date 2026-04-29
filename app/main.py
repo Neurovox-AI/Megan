@@ -55,18 +55,34 @@ def _update_win(name, js):
 
 def _patch_overlay_window():
     def _bg():
-        time.sleep(0.4)
+        time.sleep(0.5)
         def _main():
             try:
-                import AppKit
+                import AppKit, objc
+                WKWebView = objc.lookUpClass('WKWebView')
+
+                def fix_webview(view):
+                    try:
+                        if view.isKindOfClass_(WKWebView):
+                            view.setValue_forKey_(False, 'drawsBackground')
+                            return True
+                        for sv in view.subviews():
+                            if fix_webview(sv): return True
+                    except: pass
+                    return False
+
                 for ns_win in AppKit.NSApp.windows():
-                    if ns_win.title() == "__VI_OVERLAY__":
-                        ns_win.setOpaque_(False)
-                        ns_win.setBackgroundColor_(AppKit.NSColor.clearColor())
-                        ns_win.setHasShadow_(False)
-                        ns_win.setLevel_(AppKit.NSFloatingWindowLevel)
-                        print("[Overlay] Transparenz OK")
-                        return
+                    try:
+                        sz = ns_win.frame().size
+                        if int(sz.width) == 260 and int(sz.height) == 260:
+                            ns_win.setOpaque_(False)
+                            ns_win.setBackgroundColor_(AppKit.NSColor.clearColor())
+                            ns_win.setHasShadow_(False)
+                            ns_win.setLevel_(AppKit.NSFloatingWindowLevel)
+                            fix_webview(ns_win.contentView())
+                            print("[Overlay] Transparenz OK")
+                            return
+                    except: pass
             except Exception as e:
                 print(f"[Overlay] {e}")
         try:
