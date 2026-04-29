@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Megan Overlay</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { width:320px; height:64px; background:transparent; overflow:hidden; }
+
+  .pill {
+    width:320px; height:64px;
+    background:rgba(14,10,8,0.88);
+    border-radius:32px;
+    border:1px solid rgba(232,69,106,0.25);
+    box-shadow:0 8px 32px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.04) inset;
+    backdrop-filter:blur(24px);
+    display:flex; align-items:center;
+    padding:0 20px; gap:12px;
+    -webkit-app-region:drag;
+    transition:border-color 0.3s ease;
+  }
+  .pill.listening { border-color:rgba(232,69,106,0.6); }
+  .pill.speaking  { border-color:rgba(244,114,182,0.5); }
+
+  .dot {
+    width:10px; height:10px; border-radius:50%;
+    background:#E8456A; flex-shrink:0;
+    box-shadow:0 0 8px rgba(232,69,106,0.8);
+    transition:all 0.3s;
+  }
+  .dot.thinking { background:#F472B6; animation:pulse 1s infinite; }
+  .dot.speaking  { background:#F472B6; }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .label {
+    font-family:-apple-system,sans-serif;
+    font-size:13px; font-weight:500;
+    color:rgba(255,255,255,0.85);
+    flex:1;
+    -webkit-app-region:drag;
+  }
+
+  .bars {
+    display:flex; gap:3px; align-items:center; height:28px;
+    -webkit-app-region:no-drag;
+  }
+  .bar {
+    width:3px; border-radius:2px;
+    background:linear-gradient(to top,#E8456A,#F472B6);
+    animation:bounce 0.7s ease-in-out infinite;
+    transform-origin:bottom;
+  }
+  .bar:nth-child(1){height:8px;  animation-delay:0s}
+  .bar:nth-child(2){height:16px; animation-delay:0.1s}
+  .bar:nth-child(3){height:22px; animation-delay:0.2s}
+  .bar:nth-child(4){height:14px; animation-delay:0.15s}
+  .bar:nth-child(5){height:10px; animation-delay:0.05s}
+  .bar:nth-child(6){height:18px; animation-delay:0.25s}
+  .bar:nth-child(7){height:8px;  animation-delay:0.1s}
+
+  @keyframes bounce {
+    0%,100%{transform:scaleY(0.3)} 50%{transform:scaleY(1)}
+  }
+
+  .bars.still .bar { animation:none; transform:scaleY(0.2); opacity:0.4; }
+</style>
+</head>
+<body>
+<div class="pill" id="pill">
+  <div class="dot" id="dot"></div>
+  <span class="label" id="label">Megan hört zu...</span>
+  <div class="bars" id="bars">
+    <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+    <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+    <div class="bar"></div>
+  </div>
+</div>
+<script>
+const STATES = {
+  listening: { label:"Megan hört zu...",  dotClass:"",         barsClass:"",      pillClass:"listening" },
+  thinking:  { label:"Denkt nach...",      dotClass:"thinking", barsClass:"still", pillClass:"" },
+  speaking:  { label:"Spricht...",         dotClass:"speaking", barsClass:"",      pillClass:"speaking" },
+};
+function setStatus(s) {
+  const st = STATES[s];
+  if (!st) return;
+  document.getElementById("label").textContent  = st.label;
+  document.getElementById("dot").className       = "dot " + st.dotClass;
+  document.getElementById("bars").className      = "bars " + st.barsClass;
+  document.getElementById("pill").className      = "pill " + st.pillClass;
+}
+window.setStatus = setStatus;
+</script>
+</body>
+</html>
