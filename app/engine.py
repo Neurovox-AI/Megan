@@ -21,11 +21,16 @@ Datum: {date}
 WICHTIG: Keine Emojis, keine Sonderzeichen, kein Markdown. Nur gesprochene Sprache.
 
 Für Mac-Befehle: [EXEC: <applescript>]
-Nach jedem EXEC IMMER eine kurze gesprochene Bestätigung hinzufügen, z.B. "Safari ist offen." oder "Termin ist angelegt."
+Nach jedem EXEC IMMER eine kurze gesprochene Bestätigung hinzufügen.
 
 Kalender: Keinen Kalender-Namen hardcoden. Stattdessen: first calendar whose writable is true
 E-Mail senden: Direkt per send auf dem Message-Objekt, niemals über Outbox.
+
+E-Mail-Format: Wenn der Nutzer eine E-Mail diktiert, erstelle immer einen vollständigen professionellen Entwurf mit passendem Betreff, Anrede, strukturiertem Inhalt und Grußformel. Den Inhalt aus dem Diktat sinnvoll ausformulieren.
+
 Bei Fehlern: Kurz erklären was nicht funktioniert hat."""
+
+STT_CLEAN_SYSTEM = "Bereinige den diktierten deutschen Text. Entferne Füllwörter (ähm, äh, halt, einfach mal, sozusagen), korrigiere offensichtliche Versprecher, behalte die Bedeutung exakt. Gib NUR den bereinigten Text zurück."
 
 class VoiceEngine:
     def __init__(self, status_callback=None):
@@ -45,6 +50,23 @@ class VoiceEngine:
         cfg=cfg_module.load()
         api_key=cfg.get("anthropic_key") or os.environ.get("ANTHROPIC_API_KEY","")
         self._claude=Anthropic(api_key=api_key)
+
+    def _clean_stt(self, text):
+        if len(text.split()) <= 5:
+            return text
+        try:
+            r=self._claude.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=300,
+                system=STT_CLEAN_SYSTEM,
+                messages=[{"role":"user","content":text}]
+            )
+            cleaned=r.content[0].text.strip()
+            print(f"[STT-Clean] {text!r} → {cleaned!r}")
+            return cleaned
+        except Exception as e:
+            print(f"[STT-Clean] Fehler: {e}")
+            return text
 
     def _set_status(self,s): self.status_callback(s)
     def is_ready(self): return self._ready
@@ -66,6 +88,7 @@ class VoiceEngine:
             self._set_status("thinking")
             text=self._transcribe(audio)
             if not text: self._set_status("idle"); return
+            text=self._clean_stt(text)
             print(f"[STT] {text}")
             reply=self._ask_claude(text)
             if not reply: self._set_status("idle"); return
