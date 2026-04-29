@@ -39,6 +39,8 @@ WICHTIG: Keine Emojis, keine Sonderzeichen, kein Markdown. Nur gesprochene Sprac
 Für Mac-Befehle: [EXEC: <applescript>]
 Nach jedem EXEC IMMER eine kurze gesprochene Bestätigung hinzufügen.
 
+App öffnen: [EXEC: tell application "AppName" to activate]
+App schließen: [EXEC: tell application "AppName" to quit]
 Kalender: Keinen Kalender-Namen hardcoden. Stattdessen: first calendar whose writable is true
 E-Mail senden: Direkt per send auf dem Message-Objekt, niemals über Outbox.
 
@@ -181,15 +183,22 @@ class VoiceEngine:
         if m:
             cmd=m.group(1).strip()
             try:
-                with tempfile.NamedTemporaryFile(suffix=".applescript", mode="w", delete=False) as f:
-                    f.write(cmd); script_path=f.name
-                result=subprocess.run(["osascript", script_path], capture_output=True, text=True, timeout=10)
-                if result.returncode != 0:
-                    print(f"[EXEC] Fehler: {result.stderr.strip()}")
+                # Einfaches "App öffnen" → open-Befehl (keine Automation-Permission nötig)
+                open_match=re.match(r'tell application "([^"]+)"\s+to\s+activate\s*$', cmd, re.IGNORECASE)
+                if open_match:
+                    app=open_match.group(1)
+                    subprocess.Popen(["open", "-a", app])
+                    print(f"[EXEC] open -a {app}")
                 else:
-                    print(f"[EXEC] OK: {result.stdout.strip()[:80]}")
-                try: os.unlink(script_path)
-                except: pass
+                    with tempfile.NamedTemporaryFile(suffix=".applescript", mode="w", delete=False) as f:
+                        f.write(cmd); script_path=f.name
+                    result=subprocess.run(["osascript", script_path], capture_output=True, text=True, timeout=10)
+                    if result.returncode != 0:
+                        print(f"[EXEC] Fehler: {result.stderr.strip()}")
+                    else:
+                        print(f"[EXEC] OK: {result.stdout.strip()[:80]}")
+                    try: os.unlink(script_path)
+                    except: pass
             except Exception as e: print(f"[EXEC] {e}")
             return re.sub(r"\[EXEC:.*?\]","",reply,flags=re.DOTALL).strip()
         return reply
