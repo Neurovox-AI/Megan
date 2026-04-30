@@ -29,9 +29,8 @@ def _get_status():
         return {"state": "idle", "emotion": "NEUTRAL", "visible": False}
 
 
-def _set_ignore_mouse():
-    """Macht das Fenster komplett maus-transparent via AppKit."""
-    time.sleep(1.2)
+def _setup_window_on_main_thread():
+    """AppKit-Aufrufe NUR vom Main Thread — vermeidet Crash auf macOS 15+."""
     try:
         from AppKit import NSApp
         for w in NSApp.windows():
@@ -40,7 +39,7 @@ def _set_ignore_mouse():
                 w.setLevel_(8)  # NSFloatingWindowLevel
                 break
     except Exception as e:
-        print(f"[overlay setIgnoresMouseEvents: {e}]")
+        print(f"[overlay setup: {e}]")
 
 
 def _control_loop(win):
@@ -253,7 +252,6 @@ html,body{{
 
 <div class="bar" id="bar">
   <div class="orb" id="orb">
-    <div class="orb-glow"></div>
     <div class="ring" id="r1"></div>
     <div class="ring" id="r2"></div>
     <div class="wv L" id="wL">
@@ -271,7 +269,6 @@ html,body{{
     </div>
   </div>
   <div style="position:relative;display:inline-block;">
-    <div class="lbl" id="lbl">MEGAN</div>
     <div class="dot" id="dot"></div>
   </div>
 </div>
@@ -288,15 +285,14 @@ const COLS={{
 }};
 function setActive(v){{document.getElementById('bar').classList.toggle('on',v);}}
 function setState(s,e){{
-  const orb=document.getElementById('orb'),lbl=document.getElementById('lbl'),
+  const orb=document.getElementById('orb'),
         wL=document.getElementById('wL'),wR=document.getElementById('wR'),
         r1=document.getElementById('r1'),r2=document.getElementById('r2');
-  lbl.textContent=LABELS[s]||s.toUpperCase();
   orb.className='orb'; wL.className='wv L'; wR.className='wv R';
-  r1.className='ring'; r2.className='ring'; lbl.className='lbl';
-  if(s==='listening'){{orb.classList.add('fast');wL.classList.add('on');wR.classList.add('on');lbl.classList.add('on');}}
-  else if(s==='thinking'){{r1.classList.add('on');r2.classList.add('on');lbl.classList.add('on');}}
-  else if(s==='speaking'){{orb.classList.add('fast');wL.classList.add('on');wR.classList.add('on');lbl.classList.add('on');}}
+  r1.className='ring'; r2.className='ring';
+  if(s==='listening'){{orb.classList.add('fast');wL.classList.add('on');wR.classList.add('on');}}
+  else if(s==='thinking'){{r1.classList.add('on');r2.classList.add('on');}}
+  else if(s==='speaking'){{orb.classList.add('fast');wL.classList.add('on');wR.classList.add('on');}}
   const c=COLS[e]||COLS.NEUTRAL;
   document.getElementById('b1').style.background=c[0];
   document.getElementById('b2').style.background=c[1];
@@ -323,10 +319,9 @@ def main():
         shadow=False,
     )
 
-    # Maus-Events ignorieren damit der User normal weiterarbeiten kann
-    threading.Thread(target=_set_ignore_mouse, daemon=True).start()
     threading.Thread(target=_control_loop, args=(window,), daemon=True).start()
-    webview.start(debug=False)
+    # _setup_window_on_main_thread wird von webview.start als Main-Thread-Callback aufgerufen
+    webview.start(_setup_window_on_main_thread, debug=False)
 
 
 if __name__ == "__main__":

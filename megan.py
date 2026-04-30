@@ -423,7 +423,6 @@ def play_audio_bytes(audio_bytes):
 
 def pipeline_speak(text):
     """Spricht Text mit Pipelining. Stoppt bei Barge-in."""
-    print(f"Megan: {text}\n")
     _set_overlay_status("speaking", text)
     sentences = split_sentences(text)
     barge_in_event.clear()
@@ -1035,14 +1034,15 @@ def main():
     print("  Silero VAD: aktiv")
     print("  Barge-in: aktiv")
 
-    # Overlay als Subprocess starten
+    # Overlay starten — aber nur wenn noch keines läuft
     overlay_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "overlay.py")
     if os.path.exists(overlay_path):
-        subprocess.Popen(
-            [sys.executable, overlay_path],
-            cwd=os.path.dirname(overlay_path),
-        )
-        print("  Overlay: gestartet")
+        result = subprocess.run(["pgrep", "-f", "overlay.py"], capture_output=True)
+        if result.returncode != 0:
+            subprocess.Popen(
+                [sys.executable, overlay_path],
+                cwd=os.path.dirname(overlay_path),
+            )
 
     # fn-Key-Listener starten
     _start_fn_listener()
