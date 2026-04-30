@@ -16,8 +16,9 @@ env/
 # macOS
 .DS_Store
 
-# Claude Code (lokale Settings, nicht teilen)
-.claude/
+# Claude Code (lokale Daten, nicht teilen)
+.claude/*
+!.claude/settings.json
 
 # Node / Frontend
 node_modules/
