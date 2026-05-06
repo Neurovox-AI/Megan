@@ -479,6 +479,90 @@ def pipeline_speak(text):
                 break
 
 
+# ─── Quick Intent (bypasses Claude für einfache Befehle) ──────
+
+_APP_ALIASES = {
+    "safari": "Safari", "chrome": "Google Chrome", "google chrome": "Google Chrome",
+    "firefox": "Firefox", "spotify": "Spotify", "musik": "Music",
+    "apple music": "Music", "music": "Music", "pages": "Pages",
+    "numbers": "Numbers", "keynote": "Keynote", "finder": "Finder",
+    "terminal": "Terminal", "notes": "Notes", "notizen": "Notes",
+    "kalender": "Calendar", "calendar": "Calendar", "mail": "Mail",
+    "messages": "Messages", "nachrichten": "Messages", "facetime": "FaceTime",
+    "photos": "Photos", "fotos": "Photos", "maps": "Maps", "karten": "Maps",
+    "xcode": "Xcode", "vscode": "Visual Studio Code", "vs code": "Visual Studio Code",
+    "slack": "Slack", "discord": "Discord", "zoom": "Zoom",
+    "telegram": "Telegram", "whatsapp": "WhatsApp", "figma": "Figma",
+    "notion": "Notion", "obsidian": "Obsidian", "cursor": "Cursor",
+}
+
+_OPEN_RE  = re.compile(r'(?:öffne|starte|mach auf)\s+(?:die\s+|den\s+|das\s+)?(.+?)(?:\s+app)?$', re.I)
+_CLOSE_RE = re.compile(r'(?:schließe|beende|mach zu)\s+(?:die\s+|den\s+|das\s+)?(.+?)(?:\s+app)?$', re.I)
+_VOL_RE   = re.compile(r'(?:lautstärke|volume)\s+(?:auf\s+)?(\d+)', re.I)
+
+def _quick_intent(text: str):
+    t = text.lower().strip()
+
+    m = _OPEN_RE.search(t)
+    if m:
+        app = _APP_ALIASES.get(m.group(1).strip())
+        if app:
+            def _do(a=app): subprocess.Popen(["open", "-a", a])
+            return ("Läuft.", _do)
+
+    m = _CLOSE_RE.search(t)
+    if m:
+        app = _APP_ALIASES.get(m.group(1).strip())
+        if app:
+            def _do(a=app): subprocess.run(["osascript", "-e", f'tell application "{a}" to quit'])
+            return ("Erledigt.", _do)
+
+    m = _VOL_RE.search(t)
+    if m:
+        level = max(0, min(100, int(m.group(1))))
+        def _do(l=level): subprocess.run(["osascript", "-e", f"set volume output volume {l}"])
+        return (f"{level}.", _do)
+
+    if any(k in t for k in ("stumm", "mute", "ton aus", "lautlos")):
+        def _do(): subprocess.run(["osascript", "-e", "set volume output muted true"])
+        return ("Stumm.", _do)
+
+    if any(k in t for k in ("nächster", "nächstes lied", "skip", "next track")):
+        def _do(): subprocess.run(["osascript", "-e", 'tell application "Spotify" to next track'])
+        return ("Da.", _do)
+
+    if any(k in t for k in ("vorheriger", "vorheriges lied", "previous track")):
+        def _do(): subprocess.run(["osascript", "-e", 'tell application "Spotify" to previous track'])
+        return ("Da.", _do)
+
+    if any(k in t for k in ("musik pause", "musik stopp", "musik aus", "pause musik")):
+        def _do(): subprocess.run(["osascript", "-e", 'tell application "Spotify" to pause'])
+        return ("Pausiert.", _do)
+
+    if any(k in t for k in ("musik an", "musik play", "musik starten", "play musik")):
+        def _do(): subprocess.run(["osascript", "-e", 'tell application "Spotify" to play'])
+        return ("Läuft.", _do)
+
+    return None
+
+
+_CACHED_AUDIO: dict = {}
+
+def _precache_audio():
+    for phrase in ("Läuft.", "Erledigt.", "Pausiert.", "Stumm.", "Da."):
+        audio = generate_audio_bytes(phrase)
+        if audio:
+            _CACHED_AUDIO[phrase] = audio
+
+def fast_speak(text: str):
+    if text in _CACHED_AUDIO:
+        _set_overlay_status("speaking", text)
+        barge_in_event.clear()
+        play_audio_bytes(_CACHED_AUDIO[text])
+    else:
+        pipeline_speak(text)
+
+
 # ─── Claude Chat ──────────────────────────────────────────────
 
 def get_trimmed_history():
@@ -824,6 +908,14 @@ def _process_audio(audio):
         if any(p in text.lower() for p in _QUIT_PHRASES):
             pipeline_speak("Bis bald, Andreas.")
             return True
+        intent = _quick_intent(text)
+        if intent:
+            reply_text, action_fn = intent
+            action_fn()
+            print(f"  [Quick] → {reply_text}")
+            fast_speak(reply_text)
+            print()
+            return False
         reply = chat(text)
         if reply:
             pipeline_speak(reply)
@@ -1061,6 +1153,7 @@ def main():
     print("=" * 44 + "\n")
 
     threading.Thread(target=lambda: pipeline_speak("Hey Andreas. Ich bin da."), daemon=True).start()
+    threading.Thread(target=_precache_audio, daemon=True).start()
 
     try:
         while True:
