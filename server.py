@@ -22,6 +22,7 @@ from flask import Flask, request, jsonify, send_from_directory, Response
 from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), "backend", ".env"))
 
 log = logging.getLogger("megan.server")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -135,11 +136,12 @@ def transcribe_audio(audio_bytes: bytes, mime: str) -> Optional[str]:
     try:
         result = mlx_whisper.transcribe(
             tmp,
-            path_or_hf_repo="mlx-community/whisper-small-mlx-q4",
+            path_or_hf_repo="mlx-community/whisper-large-v3-turbo",
             language="de",
-            no_speech_threshold=0.6,
+            no_speech_threshold=0.4,
             condition_on_previous_text=False,
             temperature=0.0,
+            initial_prompt="Gesprochener deutscher Text, Sprachassistent, Alltagssprache.",
         )
         text = result.get("text", "").strip()
         return text if text else None

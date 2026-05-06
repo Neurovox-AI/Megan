@@ -22,6 +22,7 @@ from anthropic import Anthropic
 from dotenv import load_dotenv
 
 load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), "backend", ".env"))
 
 # --- Config ---
 SAMPLERATE          = 16000
@@ -31,7 +32,7 @@ BARGE_IN_THRESHOLD  = 1500  # Energie-Schwelle für Unterbrechung (bleibt energi
 SILENCE_DURATION    = 1.2   # Sekunden Stille bis Aufnahme endet (kürzer dank VAD)
 MAX_WAIT            = 60
 MEMORY_FILE         = os.path.expanduser("~/.megan_memory.json")
-WHISPER_MODEL       = "mlx-community/whisper-small-mlx-q4"
+WHISPER_MODEL       = "mlx-community/whisper-large-v3-turbo"
 MAX_HISTORY_TURNS   = 10     # Nur letzte 10 Exchanges → spart Tokens
 TTS_VOICE           = "de-AT-IngridNeural"
 
@@ -658,9 +659,10 @@ def transcribe(audio_data):
             tmp,
             path_or_hf_repo=WHISPER_MODEL,
             language="de",
-            no_speech_threshold=0.6,
+            no_speech_threshold=0.4,
             condition_on_previous_text=False,
             temperature=0.0,
+            initial_prompt="Gesprochener deutscher Text, Sprachassistent, Alltagssprache.",
         )
         text = result.get("text", "").strip()
         if not text or is_hallucination(text):
@@ -991,18 +993,7 @@ def main():
     print("  MEGAN — startet...")
     print("=" * 44)
 
-    print("  Spracherkennung wird geladen...", end=" ", flush=True)
-    _dummy = np.zeros(160, dtype=np.int16)
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-        wav.write(f.name, SAMPLERATE, _dummy)
-        _tmp = f.name
-    try:
-        mlx_whisper.transcribe(_tmp, path_or_hf_repo=WHISPER_MODEL, language="de")
-    except Exception:
-        pass
-    finally:
-        os.unlink(_tmp)
-    print("OK")
+    print("  Spracherkennung: bereit (lazy load)")
 
     if memory_facts:
         print(f"  Gedächtnis: {len(memory_facts)} Einträge geladen")
@@ -1023,7 +1014,7 @@ def main():
     print("  CTRL+C zum Beenden")
     print("=" * 44 + "\n")
 
-    pipeline_speak("Hey Andreas. Ich bin da.")
+    threading.Thread(target=lambda: pipeline_speak("Hey Andreas. Ich bin da."), daemon=True).start()
 
     try:
         while True:
