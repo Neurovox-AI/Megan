@@ -16,8 +16,9 @@ import torch
 from silero_vad import load_silero_vad
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
+import asyncio
+import edge_tts
 from anthropic import Anthropic
-from elevenlabs.client import ElevenLabs
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -32,10 +33,9 @@ MAX_WAIT            = 60
 MEMORY_FILE         = os.path.expanduser("~/.megan_memory.json")
 WHISPER_MODEL       = "mlx-community/whisper-small-mlx-q4"
 MAX_HISTORY_TURNS   = 10     # Nur letzte 10 Exchanges → spart Tokens
+TTS_VOICE           = "de-AT-IngridNeural"
 
-claude    = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-eleven    = ElevenLabs(api_key=os.getenv("ELEVENLABS_API_KEY"))
-VOICE_ID  = os.getenv("ELEVENLABS_VOICE_ID")
+claude = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 conversation_history  = []
 megan_is_speaking     = False
@@ -364,19 +364,18 @@ def split_sentences(text):
     return [p.strip() for p in parts if len(p.strip()) > 2]
 
 def generate_audio_bytes(text):
-    def _generate():
-        gen = eleven.text_to_speech.convert(
-            voice_id=VOICE_ID,
-            text=text,
-            model_id="eleven_flash_v2_5",
-        )
-        return b"".join(gen)
     try:
-        with ThreadPoolExecutor(max_workers=1) as ex:
-            future = ex.submit(_generate)
-            return future.result(timeout=15)
+        async def _synth():
+            tmp = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
+            tmp.close()
+            await edge_tts.Communicate(text, TTS_VOICE).save(tmp.name)
+            with open(tmp.name, "rb") as f:
+                data = f.read()
+            os.unlink(tmp.name)
+            return data
+        return asyncio.run(_synth())
     except Exception as e:
-        print(f"  [ElevenLabs Fehler: {e}]")
+        print(f"  [TTS Fehler: {e}]")
         return None
 
 def play_audio_bytes(audio_bytes):

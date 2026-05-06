@@ -107,20 +107,19 @@ def ask_claude(user_text: str):
 
 
 def synthesize(text: str) -> Optional[bytes]:
-    """Text → ElevenLabs MP3 bytes"""
-    from elevenlabs.client import ElevenLabs
-    from elevenlabs import VoiceSettings
+    """Text → edge-tts MP3 bytes"""
+    import asyncio, edge_tts
+    TTS_VOICE = "de-AT-IngridNeural"
     try:
-        client = ElevenLabs(api_key=os.environ.get("ELEVENLABS_API_KEY", ""))
-        gen = client.text_to_speech.convert(
-            voice_id=os.environ.get("ELEVENLABS_VOICE_ID", ""),
-            text=text,
-            model_id="eleven_flash_v2_5",
-            voice_settings=VoiceSettings(stability=0.55, similarity_boost=0.80,
-                                          style=0.25, use_speaker_boost=True),
-            request_options={"timeout_in_seconds": 20},
-        )
-        return b"".join(gen)
+        async def _synth():
+            tmp = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
+            tmp.close()
+            await edge_tts.Communicate(text, TTS_VOICE).save(tmp.name)
+            with open(tmp.name, "rb") as f:
+                data = f.read()
+            os.unlink(tmp.name)
+            return data
+        return asyncio.run(_synth())
     except Exception as e:
         log.error(f"TTS Fehler: {e}")
         return None
