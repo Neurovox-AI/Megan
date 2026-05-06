@@ -575,7 +575,14 @@ def chat(user_text):
                 print(f"  [Tool: {block.name} / {getattr(block, 'input', {}).get('action', '')}]")
 
                 if block.name == "mouse_click":
-                    x, y = block.input["x"], block.input["y"]
+                    x = block.input["x"]
+                    y = block.input.get("y")
+                    # Claude schickt manchmal "x, y" als String statt zwei Integers
+                    if isinstance(x, str) and "," in x:
+                        parts = x.split(",")
+                        x, y = int(parts[0].strip()), int(parts[1].strip())
+                    else:
+                        x, y = int(x), int(y)
                     btn = block.input.get("button", "left")
                     if btn == "double":
                         pyautogui.doubleClick(x, y)
@@ -627,13 +634,21 @@ def chat(user_text):
         conversation_history.append({"role": "assistant", "content": response.content})
         conversation_history.append({"role": "user", "content": tool_results})
 
-        response = claude_with_timeout(
-            model="claude-sonnet-4-6",
-            max_tokens=300,
-            system=build_system(),
-            messages=get_trimmed_history(),
-            tools=ALL_TOOLS,
-        )
+        try:
+            response = claude_with_timeout(
+                model="claude-sonnet-4-6",
+                max_tokens=300,
+                system=build_system(),
+                messages=get_trimmed_history(),
+                tools=ALL_TOOLS,
+            )
+        except Exception as e:
+            # History-Korruption verhindern: letzte zwei Einträge (tool_use + tool_result) entfernen
+            if len(conversation_history) >= 2:
+                conversation_history.pop()
+                conversation_history.pop()
+            print(f"  [Chat Fehler: {e}]")
+            return "Da ist leider etwas schiefgelaufen."
 
     final_text = "".join(
         block.text for block in response.content if hasattr(block, "text")
