@@ -1,10 +1,10 @@
 #!/bin/bash
-# Startet server.py + megan.py
 DIR="/Users/andreasdrosdov/Desktop/Claude/Projekte/Voice Impulse Projekt"
+PYTHON="/opt/homebrew/bin/python3.12"
 cd "$DIR"
 
-python3 server.py &
+"$PYTHON" server.py &
 sleep 1
-python3 megan.py &
+"$PYTHON" megan.py &
 
 wait
