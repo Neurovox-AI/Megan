@@ -32,9 +32,29 @@ BARGE_IN_THRESHOLD  = 1500  # Energie-Schwelle für Unterbrechung (bleibt energi
 SILENCE_DURATION    = 1.2   # Sekunden Stille bis Aufnahme endet (kürzer dank VAD)
 MAX_WAIT            = 60
 MEMORY_FILE         = os.path.expanduser("~/.megan_memory.json")
-WHISPER_MODEL       = "mlx-community/whisper-large-v3-turbo"
-MAX_HISTORY_TURNS   = 10     # Nur letzte 10 Exchanges → spart Tokens
+WHISPER_MODEL       = "mlx-community/whisper-medium-mlx-q4"
+MAX_HISTORY_TURNS   = 10
 TTS_VOICE           = "de-AT-IngridNeural"
+
+MODEL_FAST   = "claude-haiku-4-5-20251001"
+MODEL_STRONG = "claude-sonnet-4-6"
+
+# Einfache Befehle → Haiku (schnell)
+_SIMPLE = {"öffne", "schließe", "starte", "stopp", "mach auf", "mach zu",
+           "lautstärke", "volume", "spiel", "pause", "nächster", "weiter",
+           "hallo", "danke", "tschüss", "wie viel", "was ist", "wer ist",
+           "wie heißt", "zeig", "suche", "such", "guck", "schau"}
+# Komplexe Aufgaben → Sonnet
+_COMPLEX = {"schreib", "verfasse", "erkläre", "analysiere", "zusammenfass",
+            "erstelle", "mehrere", "und danach", "außerdem", "email", "mail",
+            "termin", "kalender", "erinnerung", "liste", "dokument"}
+
+def _select_model(text: str) -> str:
+    t = text.lower()
+    if any(k in t for k in _COMPLEX): return MODEL_STRONG
+    if len(t.split()) > 12: return MODEL_STRONG
+    if any(k in t for k in _SIMPLE): return MODEL_FAST
+    return MODEL_FAST  # default Haiku, Sonnet nur wenn nötig
 
 claude = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
@@ -556,8 +576,9 @@ def chat(user_text):
             future = ex.submit(_claude_call, **kwargs)
             return future.result(timeout=30)
 
+    selected_model = _select_model(user_text)
     response = claude_with_timeout(
-        model="claude-sonnet-4-6",
+        model=selected_model,
         max_tokens=300,
         system=build_system(),
         messages=get_trimmed_history(),
@@ -636,7 +657,7 @@ def chat(user_text):
 
         try:
             response = claude_with_timeout(
-                model="claude-sonnet-4-6",
+                model=MODEL_STRONG,
                 max_tokens=300,
                 system=build_system(),
                 messages=get_trimmed_history(),
