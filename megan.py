@@ -231,22 +231,24 @@ TOOLS = [
     },
     {
         "name": "open_website",
-        "description": "Öffnet eine URL im Browser.",
+        "description": "Öffnet eine URL im Browser. Wenn ein bestimmter Browser gewünscht wird (z.B. Safari, Chrome, Firefox), browser-Parameter setzen.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "url": {"type": "string"}
+                "url": {"type": "string"},
+                "browser": {"type": "string", "description": "Optional: 'Safari', 'Google Chrome', 'Firefox'"}
             },
             "required": ["url"]
         }
     },
     {
         "name": "search_web",
-        "description": "Sucht etwas bei Google (öffnet Browser).",
+        "description": "Sucht etwas bei Google (öffnet Browser). Wenn ein bestimmter Browser gewünscht wird, browser-Parameter setzen.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "query": {"type": "string"}
+                "query": {"type": "string"},
+                "browser": {"type": "string", "description": "Optional: 'Safari', 'Google Chrome', 'Firefox'"}
             },
             "required": ["query"]
         }
@@ -315,12 +317,20 @@ def execute_tool(name, inp):
             return f"Musik: {action}"
 
         elif name == "open_website":
-            subprocess.Popen(["open", inp["url"]])
+            browser = inp.get("browser")
+            if browser:
+                subprocess.Popen(["open", "-a", browser, inp["url"]])
+            else:
+                subprocess.Popen(["open", inp["url"]])
             return "Seite geöffnet."
 
         elif name == "search_web":
             url = "https://www.google.com/search?q=" + urllib.parse.quote(inp["query"])
-            subprocess.Popen(["open", url])
+            browser = inp.get("browser")
+            if browser:
+                subprocess.Popen(["open", "-a", browser, url])
+            else:
+                subprocess.Popen(["open", url])
             return f"Suche nach '{inp['query']}' geöffnet."
 
         elif name == "show_notification":
