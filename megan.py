@@ -514,7 +514,10 @@ def _quick_intent(text: str):
     if m:
         app = _APP_ALIASES.get(m.group(1).strip())
         if app:
-            def _do(a=app): subprocess.Popen(["open", "-a", a])
+            def _do(a=app):
+                already = subprocess.run(["pgrep", "-ix", a], capture_output=True).returncode == 0
+                subprocess.Popen(["open", "-a", a])
+                return "Ist schon offen." if already else None
             return ("Läuft.", _do)
 
     m = _CLOSE_RE.search(t)
@@ -918,7 +921,9 @@ def _process_audio(audio):
         intent = _quick_intent(text)
         if intent:
             reply_text, action_fn = intent
-            action_fn()
+            override = action_fn()
+            if override:
+                reply_text = override
             print(f"  [Quick] → {reply_text}")
             fast_speak(reply_text)
             print()
